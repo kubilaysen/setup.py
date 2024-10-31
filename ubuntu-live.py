@@ -13,44 +13,47 @@ DBNAME='prestashop_db'
 DBUSER='kubi'
 
 # Kullanıcıya bilgi verin
-echo "PrestaShop 8.0 kurulumu başlatılıyor..."
+echo "Apache ve PrestaShop kurulumları başlatılıyor..."
 
-# 1. Gerekli paketlerin yüklü olup olmadığını kontrol edin
-echo "Gerekli paketlerin yüklü olup olmadığını kontrol ediliyor..."
-REQUIRED_PACKAGES=(apache2 mysql-server php libapache2-mod-php php-mysql php-gd php-curl php-xml php-zip php-mbstring php-intl php-soap php-xmlrpc php-json unzip certbot python3-certbot-apache)
-for package in "${REQUIRED_PACKAGES[@]}"; do
-    if ! dpkg -l | grep -q "^ii.*$package"; then
-        echo "$package yüklü değil, yüklenecek..."
-        sudo apt install -y "$package"
-    else
-        echo "$package zaten yüklü."
-    fi
-done
+# 1. Apache’yi kaldır ve temizle
+echo "Apache’yi kaldırıyor ve temizliyor..."
+sudo systemctl stop apache2
+sudo apt remove --purge -y apache2 apache2-utils apache2-bin apache2.2-common
+sudo apt autoremove -y
+sudo rm -rf /etc/apache2 /var/www/html /var/log/apache2 /var/www/*
 
-# 2. Apache modüllerini etkinleştirin
+# 2. Apache’yi yeniden kur
+echo "Apache’yi yeniden kuruyor..."
+sudo apt update
+sudo apt install -y apache2
+
+# 3. Gerekli Apache modüllerini etkinleştir
 echo "Apache modülleri etkinleştiriliyor..."
-sudo a2enmod rewrite ssl headers env dir mime || { echo "Apache modülleri etkinleştirilemedi."; exit 1; }
+sudo a2enmod rewrite ssl headers env dir mime
 
-# 3. Apache yapılandırma dosyasını test edin
+# 4. Apache yapılandırma dosyasını test edin
 echo "Apache yapılandırması test ediliyor..."
 if ! sudo apache2ctl configtest; then
     echo "Apache yapılandırma testinde hata bulundu. Lütfen yapılandırma dosyalarını kontrol edin."
     exit 1
 fi
 
-# 4. Apache ve MySQL sunucusunu yeniden başlatın
-echo "Apache ve MySQL sunucuları yeniden başlatılıyor..."
-sudo systemctl restart apache2 || { echo "Apache yeniden başlatılamadı."; exit 1; }
-sudo systemctl restart mysql || { echo "MySQL yeniden başlatılamadı."; exit 1; }
+# 5. Apache’yi yeniden başlatın
+echo "Apache sunucusu yeniden başlatılıyor..."
+sudo systemctl restart apache2
 
-# 5. MySQL root şifresini ayarlayın ve güvenliği artırın
+# 6. Gerekli diğer paketleri kur
+echo "Gerekli diğer paketler kuruluyor..."
+sudo apt install -y mysql-server php libapache2-mod-php php-mysql php-gd php-curl php-xml php-zip php-mbstring php-intl php-soap php-xmlrpc php-json unzip certbot python3-certbot-apache
+
+# 7. MySQL root şifresini ayarla ve güvenliği artır
 echo "MySQL root şifresi ayarlanıyor ve güvenlik artırılıyor..."
 sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASS}';"
 sudo mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.user WHERE User='';"
 sudo mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DROP DATABASE IF EXISTS test;"
 sudo mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
 
-# 6. PrestaShop için MySQL veritabanı oluşturun
+# 8. PrestaShop için MySQL veritabanı oluştur
 echo "PrestaShop için MySQL veritabanı ve kullanıcı oluşturuluyor..."
 sudo mysql -u root -p"${MYSQL_ROOT_PASS}" <<EOF
 CREATE DATABASE ${DBNAME};
@@ -59,13 +62,13 @@ GRANT ALL PRIVILEGES ON ${DBNAME}.* TO '${DBUSER}'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
-# 7. Web dizinini oluşturun ve gerekli izinleri ayarlayın
+# 9. PrestaShop için web dizinini oluştur ve izinleri ayarla
 echo "PrestaShop için web dizini oluşturuluyor..."
 sudo mkdir -p /var/www/market.kubilaysen.com/public_html
 sudo chown -R www-data:www-data /var/www/market.kubilaysen.com
 sudo chmod -R 755 /var/www/market.kubilaysen.com
 
-# 8. Apache Sanal Host yapılandırmasını oluşturun
+# 10. Apache sanal host yapılandırmasını oluştur
 echo "Apache sanal host yapılandırması oluşturuluyor..."
 sudo tee /etc/apache2/sites-available/market.kubilaysen.com.conf > /dev/null <<EOT
 <VirtualHost *:80>
@@ -81,12 +84,12 @@ sudo tee /etc/apache2/sites-available/market.kubilaysen.com.conf > /dev/null <<E
 </VirtualHost>
 EOT
 
-# 9. Yeni sanal hostu etkinleştir ve varsayılan siteyi devre dışı bırak
+# 11. Yeni sanal hostu etkinleştir ve varsayılan siteyi devre dışı bırak
 echo "Yeni sanal host etkinleştiriliyor..."
 sudo a2ensite market.kubilaysen.com.conf
 sudo a2dissite 000-default.conf
 
-# 10. Apache yapılandırmasını tekrar test edin ve yeniden başlatın
+# 12. Apache yapılandırmasını tekrar test edin ve yeniden başlatın
 echo "Apache yapılandırması tekrar test ediliyor..."
 if sudo apache2ctl configtest; then
     sudo systemctl reload apache2 || { echo "Apache yeniden yüklenemedi."; exit 1; }
@@ -96,30 +99,30 @@ else
     exit 1
 fi
 
-# 11. PrestaShop 8.0'u indirin
+# 13. PrestaShop 8.0'u indirin
 echo "PrestaShop 8.0 indiriliyor..."
 cd /tmp
 wget https://download.prestashop.com/download/releases/prestashop_8.0.0.zip -O prestashop.zip
 
-# 12. PrestaShop'u açın
+# 14. PrestaShop’u web dizinine açın
 echo "PrestaShop açılıyor..."
 sudo unzip -q prestashop.zip -d /var/www/market.kubilaysen.com/public_html
 
-# 13. İzinleri ayarlayın
+# 15. İzinleri ayarlayın
 echo "PrestaShop dizin izinleri ayarlanıyor..."
 sudo chown -R www-data:www-data /var/www/market.kubilaysen.com/public_html
 sudo find /var/www/market.kubilaysen.com/public_html -type d -exec sudo chmod 755 {} \;
 sudo find /var/www/market.kubilaysen.com/public_html -type f -exec sudo chmod 644 {} \;
 
-# 14. Güvenlik duvarı ayarları (UFW kullanılıyorsa)
+# 16. Güvenlik duvarı ayarları (UFW kullanılıyorsa)
 echo "Güvenlik duvarı ayarları yapılıyor..."
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw enable <<< "y"
 
-# 15. SSL sertifikalarını kurun (Let's Encrypt kullanarak)
+# 17. SSL sertifikalarını kur (Let's Encrypt kullanarak)
 echo "Let's Encrypt SSL sertifikaları kuruluyor..."
 sudo certbot --apache -d market.kubilaysen.com --redirect --non-interactive --agree-tos --expand -m your-email@example.com
 
-# 16. Kurulum tamamlandı mesajı
+# 18. Kurulum tamamlandı mesajı
 echo "Kurulum tamamlandı. Lütfen PrestaShop kurulumunu tamamlamak için tarayıcınızdan http://market.kubilaysen.com adresine gidin."
