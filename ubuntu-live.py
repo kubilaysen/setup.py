@@ -29,7 +29,7 @@ done
 
 # 2. Apache modüllerini etkinleştirin
 echo "Apache modülleri etkinleştiriliyor..."
-sudo a2enmod rewrite ssl headers env dir mime
+sudo a2enmod rewrite ssl headers env dir mime || { echo "Apache modülleri etkinleştirilemedi."; exit 1; }
 
 # 3. Apache yapılandırma dosyasını test edin
 echo "Apache yapılandırması test ediliyor..."
@@ -89,7 +89,7 @@ sudo a2dissite 000-default.conf
 # 10. Apache yapılandırmasını tekrar test edin ve yeniden başlatın
 echo "Apache yapılandırması tekrar test ediliyor..."
 if sudo apache2ctl configtest; then
-    sudo systemctl reload apache2
+    sudo systemctl reload apache2 || { echo "Apache yeniden yüklenemedi."; exit 1; }
     echo "Apache yapılandırması başarılı bir şekilde yeniden yüklendi."
 else
     echo "Yapılandırma hatası bulundu, Apache yeniden başlatılmadı. Kontrol edin."
