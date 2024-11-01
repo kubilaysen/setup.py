@@ -13,9 +13,9 @@ check_success() {
 
 # Kullanıcıdan gerekli bilgileri al
 read -p "Lütfen sunucunuzun alan adını girin (örnek: market.kubilaysen.com): " DOMAIN
-read -p "Lütfen MySQL root kullanıcısı için güçlü bir şifre girin: " -s ROOT_PASSWORD
+read -s -p "Lütfen MySQL root kullanıcısı için güçlü bir şifre girin: " ROOT_PASSWORD
 echo
-read -p "Lütfen 'kubi' kullanıcısı için güçlü bir şifre girin: " -s KUBI_PASSWORD
+read -s -p "Lütfen 'kubi' kullanıcısı için güçlü bir şifre girin: " KUBI_PASSWORD
 echo
 read -p "PrestaShop için PHP'de kullanılacak maksimum dosya yükleme boyutunu girin (örnek: 64M): " UPLOAD_MAX_FILESIZE
 read -p "PHP için kullanılacak maksimum post boyutunu girin (örnek: 64M): " POST_MAX_SIZE
@@ -50,17 +50,17 @@ echo "MySQL kuruluyor..."
 sudo apt install -y mysql-server
 check_success "MySQL kurulumu"
 
-# MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme ve şifre belirleme
+# MySQL root kullanıcısı ile şifre ile bağlanarak kimlik doğrulama yöntemini değiştirme
 echo "MySQL root kullanıcısının kimlik doğrulama yöntemi değiştiriliyor..."
-sudo mysql <<MYSQL_SCRIPT
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ROOT_PASSWORD';
+sudo mysql -u root -p"${ROOT_PASSWORD}" <<MYSQL_SCRIPT
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme ve şifre belirleme"
 
-# MySQL güvenlik yapılandırması
+# MySQL güvenlik yapılandırması (Anonim kullanıcıları kaldırma, test veritabanını silme vb.)
 echo "MySQL güvenlik yapılandırması yapılıyor..."
-sudo mysql <<MYSQL_SCRIPT
+sudo mysql -u root -p"${ROOT_PASSWORD}" <<MYSQL_SCRIPT
 -- Remove anonymous users
 DELETE FROM mysql.user WHERE User='';
 -- Disallow root login remotely
@@ -74,11 +74,11 @@ check_success "MySQL güvenlik yapılandırması"
 
 # MySQL veritabanı ve kullanıcı ayarları
 echo "MySQL veritabanı ve kullanıcı ayarları yapılıyor..."
-sudo mysql <<MYSQL_SCRIPT
+sudo mysql -u root -p"${ROOT_PASSWORD}" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 DROP USER IF EXISTS 'kubi'@'localhost';
-CREATE USER 'kubi'@'localhost' IDENTIFIED BY '$KUBI_PASSWORD';
+CREATE USER 'kubi'@'localhost' IDENTIFIED BY '${KUBI_PASSWORD}';
 GRANT ALL PRIVILEGES ON prestashop_db.* TO 'kubi'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
@@ -86,7 +86,7 @@ check_success "MySQL veritabanı ve kullanıcı ayarları"
 
 # MySQL bağlantısını test etme
 echo "MySQL bağlantısını test ediyor..."
-mysql -u kubi -p"$KUBI_PASSWORD" -h 127.0.0.1 prestashop_db -e "SELECT DATABASE();"
+mysql -u kubi -p"${KUBI_PASSWORD}" -h 127.0.0.1 prestashop_db -e "SELECT DATABASE();"
 check_success "MySQL 'kubi' kullanıcısı ile bağlantı testi"
 
 # PHP'yi kurma ve gerekli uzantıları yükleme
@@ -98,12 +98,12 @@ check_success "PHP ve uzantılar kurulumu"
 echo "PHP ayarları düzenleniyor..."
 PHP_INI="/etc/php/7.4/apache2/php.ini"
 
-sudo sed -i "s/memory_limit = .*/memory_limit = 256M/" $PHP_INI
-sudo sed -i "s/upload_max_filesize = .*/upload_max_filesize = $UPLOAD_MAX_FILESIZE/" $PHP_INI
-sudo sed -i "s/post_max_size = .*/post_max_size = $POST_MAX_SIZE/" $PHP_INI
-sudo sed -i "s/max_execution_time = .*/max_execution_time = $MAX_EXECUTION_TIME/" $PHP_INI
-sudo sed -i "s/max_input_vars = .*/max_input_vars = $MAX_INPUT_VARS/" $PHP_INI
-sudo sed -i "s/allow_url_fopen = Off/allow_url_fopen = On/" $PHP_INI
+sudo sed -i "s/memory_limit = .*/memory_limit = 256M/" "${PHP_INI}"
+sudo sed -i "s/upload_max_filesize = .*/upload_max_filesize = ${UPLOAD_MAX_FILESIZE}/" "${PHP_INI}"
+sudo sed -i "s/post_max_size = .*/post_max_size = ${POST_MAX_SIZE}/" "${PHP_INI}"
+sudo sed -i "s/max_execution_time = .*/max_execution_time = ${MAX_EXECUTION_TIME}/" "${PHP_INI}"
+sudo sed -i "s/max_input_vars = .*/max_input_vars = ${MAX_INPUT_VARS}/" "${PHP_INI}"
+sudo sed -i "s/allow_url_fopen = Off/allow_url_fopen = On/" "${PHP_INI}"
 check_success "PHP ayarlarının düzenlenmesi"
 
 # Apache için DirectoryIndex sırasını değiştirme
@@ -118,6 +118,12 @@ check_success "Apache yeniden başlatma"
 
 # phpMyAdmin kurulumu
 echo "phpMyAdmin kuruluyor..."
+sudo debconf-set-selections <<< "phpmyadmin phpmyadmin/dbconfig-install boolean true"
+sudo debconf-set-selections <<< "phpmyadmin phpmyadmin/app-password-confirm password ${ROOT_PASSWORD}"
+sudo debconf-set-selections <<< "phpmyadmin phpmyadmin/mysql/admin-pass password ${ROOT_PASSWORD}"
+sudo debconf-set-selections <<< "phpmyadmin phpmyadmin/mysql/app-pass password ${ROOT_PASSWORD}"
+sudo debconf-set-selections <<< "phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2"
+
 sudo apt install -y phpmyadmin
 check_success "phpMyAdmin kurulumu"
 
@@ -129,17 +135,17 @@ check_success "phpMyAdmin Apache ile entegrasyonu"
 
 # Apache sanal ana bilgisayarını oluşturma
 echo "Apache sanal ana bilgisayarı oluşturuluyor..."
-sudo mkdir -p $WEB_ROOT
-sudo chown -R $USER:$USER $WEB_ROOT
+sudo mkdir -p "${WEB_ROOT}"
+sudo chown -R "${USER}:${USER}" "${WEB_ROOT}"
 
-sudo bash -c "cat > $APACHE_CONF <<EOL
+sudo bash -c "cat > ${APACHE_CONF} <<EOL
 <VirtualHost *:80>
-    ServerName $DOMAIN
-    ServerAlias www.$DOMAIN
-    ServerAdmin webmaster@$DOMAIN
-    DocumentRoot $WEB_ROOT
+    ServerName ${DOMAIN}
+    ServerAlias www.${DOMAIN}
+    ServerAdmin webmaster@${DOMAIN}
+    DocumentRoot ${WEB_ROOT}
 
-    <Directory $WEB_ROOT>
+    <Directory ${WEB_ROOT}>
         Options Indexes FollowSymLinks
         AllowOverride All
         Require all granted
@@ -154,7 +160,7 @@ check_success "Apache sanal ana bilgisayarı oluşturma"
 
 # Apache sanal ana bilgisayarını etkinleştirme ve varsayılan siteyi devre dışı bırakma
 echo "Apache sanal ana bilgisayarı etkinleştiriliyor ve varsayılan site devre dışı bırakılıyor..."
-sudo a2ensite $DOMAIN.conf
+sudo a2ensite "${DOMAIN}.conf"
 sudo a2dissite 000-default.conf
 check_success "Apache sanal ana bilgisayarı etkinleştirme ve varsayılan siteyi devre dışı bırakma"
 
@@ -175,21 +181,19 @@ cd /tmp
 # PrestaShop'un en son sürümünü dinamik olarak tespit etme
 PRESTASHOP_VERSION=$(curl -s https://api.github.com/repos/PrestaShop/PrestaShop/releases/latest | grep tag_name | cut -d '"' -f4)
 
-if [ -z "$PRESTASHOP_VERSION" ]; then
+if [ -z "${PRESTASHOP_VERSION}" ]; then
     echo "Hata: En son PrestaShop sürümü bulunamadı." >&2
     exit 1
 fi
 
-echo "Bulunan en son PrestaShop sürümü: $PRESTASHOP_VERSION"
+echo "Bulunan en son PrestaShop sürümü: ${PRESTASHOP_VERSION}"
 
 # Etiketin 'v' ile başlamadığını kontrol et ve uygun şekilde işleme al
-if [[ "$PRESTASHOP_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    # Etiket 'v' ile başlıyorsa, 'v' önekini kaldır
+if [[ "${PRESTASHOP_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     VERSION="${PRESTASHOP_VERSION#v}"
     PRESTASHOP_URL="https://github.com/PrestaShop/PrestaShop/releases/download/${PRESTASHOP_VERSION}/prestashop_${VERSION}.zip"
-elif [[ "$PRESTASHOP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    # Etiket 'v' ile başlamıyorsa, doğrudan sürüm numarasını kullan
-    VERSION="$PRESTASHOP_VERSION"
+elif [[ "${PRESTASHOP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    VERSION="${PRESTASHOP_VERSION}"
     PRESTASHOP_URL="https://github.com/PrestaShop/PrestaShop/releases/download/${PRESTASHOP_VERSION}/prestashop_${VERSION}.zip"
 else
     echo "Hata: PrestaShop sürüm etiketi beklenen formatta değil." >&2
@@ -197,18 +201,18 @@ else
 fi
 
 # PrestaShop'u indir
-wget "$PRESTASHOP_URL" -O prestashop_latest.zip
+wget "${PRESTASHOP_URL}" -O prestashop_latest.zip
 check_success "PrestaShop sürümünü indirme"
 
 # PrestaShop dosyalarını çıkarma
-sudo unzip -o prestashop_latest.zip -d $WEB_ROOT
+sudo unzip -o prestashop_latest.zip -d "${WEB_ROOT}"
 check_success "PrestaShop dosyalarını çıkarma"
 
 # Dosya izinlerini ayarlama
 echo "PrestaShop dosya izinleri ayarlanıyor..."
-sudo chown -R www-data:www-data $WEB_ROOT
-sudo find $WEB_ROOT -type d -exec chmod 755 {} \;
-sudo find $WEB_ROOT -type f -exec chmod 644 {} \;
+sudo chown -R www-data:www-data "${WEB_ROOT}"
+sudo find "${WEB_ROOT}" -type d -exec chmod 755 {} \;
+sudo find "${WEB_ROOT}" -type f -exec chmod 644 {} \;
 check_success "PrestaShop dosya izinlerini ayarlama"
 
 # .htaccess dosyasını etkinleştirme
@@ -219,10 +223,10 @@ check_success ".htaccess modülü etkinleştirme ve Apache yeniden başlatma"
 
 # PrestaShop için Apache sanal ana bilgisayarını güncelleme
 echo "PrestaShop için Apache sanal ana bilgisayarı güncelleniyor..."
-sudo bash -c "cat >> $APACHE_CONF <<EOL
+sudo bash -c "cat >> ${APACHE_CONF} <<EOL
 
 # Allow .htaccess Overrides
-<Directory $WEB_ROOT>
+<Directory ${WEB_ROOT}>
     AllowOverride All
 </Directory>
 EOL"
@@ -233,11 +237,11 @@ check_success "Apache yeniden yükleme"
 
 # phpMyAdmin için güvenlik ayarları (Opsiyonel)
 read -p "phpMyAdmin'e ek güvenlik önlemleri eklemek istiyor musunuz? [y/N]: " phpmyadmin_security
-if [[ "$phpmyadmin_security" =~ ^[Yy]$ ]]; then
+if [[ "${phpmyadmin_security}" =~ ^[Yy]$ ]]; then
     echo "phpMyAdmin'e ek güvenlik önlemleri ekleniyor..."
     # Örneğin, sadece belirli IP adreslerinden erişim sağlamak için
     read -p "phpMyAdmin'e sadece hangi IP adresinden erişim sağlanacak? (örn: 123.456.789.0): " ALLOWED_IP
-    sudo sed -i "/<Directory \/usr\/share\/phpmyadmin>/a \ \ \ \ Require ip $ALLOWED_IP" /etc/apache2/conf-available/phpmyadmin.conf
+    sudo sed -i "/<Directory \/usr\/share\/phpmyadmin>/a \ \ \ \ Require ip ${ALLOWED_IP}" /etc/apache2/conf-available/phpmyadmin.conf
     sudo systemctl reload apache2
     check_success "phpMyAdmin güvenlik ayarları"
     echo "phpMyAdmin'e sadece belirtilen IP adresinden erişim sağlanacaktır."
@@ -245,18 +249,18 @@ fi
 
 # Test PHP işleme
 echo "PHP işleme testi yapılıyor..."
-echo "<?php phpinfo(); ?>" > $WEB_ROOT/info.php
+echo "<?php phpinfo(); ?>" > "${WEB_ROOT}/info.php"
 check_success "PHP info.php dosyası oluşturma"
 
-echo "Lütfen tarayıcınızda http://$DOMAIN/info.php adresine gidin ve PHP'nin düzgün çalıştığını doğrulayın."
+echo "Lütfen tarayıcınızda http://${DOMAIN}/info.php adresine gidin ve PHP'nin düzgün çalıştığını doğrulayın."
 echo "Eğer doğru çalışıyorsa, info.php dosyasını silmek için aşağıdaki komutu kullanabilirsiniz:"
-echo "sudo rm $WEB_ROOT/info.php"
+echo "sudo rm ${WEB_ROOT}/info.php"
 
 # PrestaShop için PHP test dosyası oluşturma
 echo "PrestaShop için PHP test dosyası oluşturuluyor..."
 echo "<?php
 \$user = 'kubi';
-\$password = '$KUBI_PASSWORD';
+\$password = '${KUBI_PASSWORD}';
 \$database = 'prestashop_db';
 \$table = 'todo_list';
 
@@ -271,18 +275,18 @@ try {
     print \"Error!: \" . \$e->getMessage() . \"<br/>\";
     die();
 }
-?>" > $WEB_ROOT/todo_list.php
+?>" > "${WEB_ROOT}/todo_list.php"
 check_success "PrestaShop todo_list.php dosyası oluşturma"
 
-echo "PrestaShop için test dosyası oluşturuldu. Lütfen tarayıcınızda http://$DOMAIN/todo_list.php adresine giderek veritabanı bağlantısını test edin."
+echo "PrestaShop için test dosyası oluşturuldu. Lütfen tarayıcınızda http://${DOMAIN}/todo_list.php adresine giderek veritabanı bağlantısını test edin."
 
 # PrestaShop kurulumu tamamlandıktan sonra güvenlik için 'install' klasörünü silme
 echo "PrestaShop kurulumunu tamamladıktan sonra güvenlik için 'install' klasörünü silmeyi unutmayın:"
-echo "sudo rm -rf $WEB_ROOT/install"
+echo "sudo rm -rf ${WEB_ROOT}/install"
 
 # Ekstra: Swap alanı oluşturma (Opsiyonel)
 read -p "Sunucuda yeterli RAM yoksa swap alanı oluşturmak istiyor musunuz? [y/N]: " swap_choice
-if [[ "$swap_choice" =~ ^[Yy]$ ]]; then
+if [[ "${swap_choice}" =~ ^[Yy]$ ]]; then
     echo "Swap alanı oluşturuluyor..."
     sudo fallocate -l 2G /swapfile
     sudo chmod 600 /swapfile
