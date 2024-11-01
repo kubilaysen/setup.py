@@ -57,10 +57,10 @@ check_dns() {
 # Kullanıcıdan sudo şifresini başta bir kez istemek için
 sudo -v
 
-# Sistem güncellemesi ve gerekli paketlerin kurulumu
+# Sistem güncellemeleri ve gerekli paketlerin kurulumu
 echo "Sistem güncelleniyor ve gerekli paketler yükleniyor..."
 sudo apt update && sudo apt upgrade -y
-check_success "Sistem güncellemesi"
+check_success "Sistem güncellemeleri"
 
 # Mevcut Apache, PHP, MySQL ve phpMyAdmin kurulumlarını kaldırma
 echo "Mevcut Apache, PHP, MySQL ve phpMyAdmin kurulumları temizleniyor..."
@@ -77,14 +77,16 @@ sudo apt purge -y 'php*' || true
 sudo apt autoremove -y
 check_success "PHP kaldırma"
 
-# MySQL'i kaldır
+# MySQL'i kaldırırken ekstra adımlar ekleyelim
+echo "MySQL kaldırılıyor..."
 sudo systemctl stop mysql || true
 sudo apt purge -y mysql-server mysql-client mysql-common || true
-sudo rm -rf /etc/mysql /var/lib/mysql
+sudo rm -rf /etc/mysql /var/lib/mysql /var/run/mysqld
 sudo apt autoremove -y
 check_success "MySQL kaldırma"
 
-# phpMyAdmin'i kaldır
+# phpMyAdmin'i kaldırma
+echo "phpMyAdmin kaldırılıyor..."
 sudo apt purge -y phpmyadmin || true
 sudo rm -rf /usr/share/phpmyadmin
 sudo rm -rf /etc/phpmyadmin
@@ -130,7 +132,10 @@ check_success "Apache modüllerini etkinleştirme"
 
 # Apache'yi PHP 7.2 ile yeniden başlatma
 echo "Apache yeniden başlatılıyor ve PHP 7.2 ile çalıştırılıyor..."
-sudo a2dismod php8.1 || true  # Eğer PHP 8.1 etkinse devre dışı bırak
+# PHP 8.1 modülü mevcut değilse hata vermemesi için kontrol ekleyelim
+if sudo a2query -m php8.1 > /dev/null 2>&1; then
+    sudo a2dismod php8.1 || true
+fi
 sudo a2enmod php7.2
 sudo systemctl restart apache2
 check_success "Apache yeniden başlatma ve PHP 7.2 ile çalıştırma"
@@ -154,21 +159,29 @@ check_success "Composer kurulumu"
 
 # MySQL kurulumu ve yapılandırması
 echo "MySQL kuruluyor..."
+
+# MySQL kurulumundan önce gerekli temizlemeleri yapalım
+sudo systemctl daemon-reload
+sudo mkdir -p /var/run/mysqld
+sudo chown mysql:mysql /var/run/mysqld
+sudo chmod 755 /var/run/mysqld
+
+# MySQL paketlerini yeniden yükleyelim
 sudo apt install -y mysql-server
 check_success "MySQL kurulumu"
 
+# MySQL güvenlik yapılandırması yapıyoruz (interaktif)
 echo "MySQL güvenlik yapılandırması yapılıyor..."
 sudo mysql_secure_installation
 # Not: Bu adım interaktiftir ve kullanıcıdan çeşitli güvenlik ayarları için onay istenir.
 
 # MySQL veritabanı ve kullanıcı ayarları
 echo "MySQL veritabanı ve kullanıcı ayarları yapılıyor..."
-echo "Lütfen MySQL root şifrenizi girin:"
 sudo mysql -u root -p <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 DROP USER IF EXISTS 'kubi'@'localhost';
-CREATE USER 'kubi'@'localhost' IDENTIFIED BY 'Ks856985.,';
+CREATE USER 'kubi'@'localhost' IDENTIFIED WITH mysql_native_password BY 'Ks856985.,';
 GRANT ALL PRIVILEGES ON prestashop_db.* TO 'kubi'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
@@ -248,9 +261,6 @@ TEMP_DIR="/tmp/prestashop_download"
 sudo mkdir -p $TEMP_DIR
 sudo chmod 1777 $TEMP_DIR
 check_success "Geçici indirme dizini oluşturma ve izin ayarlama"
-
-# İndirilen dosyalar için yazma izinini sağlamak
-# Not: chmod 1777 zaten tüm kullanıcılar için yazılabilirlik sağlar
 
 cd $TEMP_DIR
 
