@@ -177,12 +177,22 @@ AUTH_PLUGIN=$(sudo mysql -u root -p"$root_password" -e "SELECT plugin FROM mysql
 
 if [ "$AUTH_PLUGIN" != "mysql_native_password" ]; then
     echo "MySQL root kullanıcısının kimlik doğrulama yöntemi mysql_native_password olarak değiştiriliyor..."
-    sudo mysql -u root -p"$root_password" -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'YeniRootSifresi'; FLUSH PRIVILEGES;"
+
+    # Geçici olarak parola politikasını düşük seviyeye çek
+    sudo mysql -u root -p"$root_password" -e "SET GLOBAL validate_password.policy = LOW; SET GLOBAL validate_password.length = 6;"
+
+    # Root kullanıcısının parolasını güçlü bir parola ile değiştir
+    NEW_ROOT_PASSWORD="YeniRootSifresi@2024"
+    sudo mysql -u root -p"$root_password" -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$NEW_ROOT_PASSWORD'; FLUSH PRIVILEGES;"
     check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme"
+
+    # Parola politikasını geri eski haline getir
+    sudo mysql -u root -p"$NEW_ROOT_PASSWORD" -e "SET GLOBAL validate_password.policy = MEDIUM; SET GLOBAL validate_password.length = 8; SET GLOBAL validate_password.number_count = 1; SET GLOBAL validate_password.special_char_count = 1;"
+    check_success "Parola politikasını geri yükleme"
 fi
 
 # 'kubi' kullanıcısı ve veritabanını oluşturma
-sudo mysql -u root -p"$root_password" <<MYSQL_SCRIPT
+sudo mysql -u root -p"$NEW_ROOT_PASSWORD" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 DROP USER IF EXISTS 'kubi'@'localhost';
