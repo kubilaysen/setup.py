@@ -160,8 +160,8 @@ sudo bash -c 'cat > /etc/apache2/sites-available/prestashop.conf <<EOL
         Require all granted
     </Directory>
 
-    ErrorLog \${APACHE_LOG_DIR}/prestashop_error.log
-    CustomLog \${APACHE_LOG_DIR}/prestashop_access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/prestashop_error.log
+    CustomLog ${APACHE_LOG_DIR}/prestashop_access.log combined
 </VirtualHost>
 EOL'
 check_success "Apache sanal ana bilgisayar yapılandırması"
@@ -195,21 +195,24 @@ fi
 echo "PrestaShop indiriliyor ve kuruluyor..."
 cd /tmp
 PRESTASHOP_VERSION=$(curl -s https://api.github.com/repos/PrestaShop/PrestaShop/releases/latest | grep tag_name | cut -d '"' -f4)
-wget https://github.com/PrestaShop/PrestaShop/releases/download/${PRESTASHOP_VERSION}/prestashop_${PRESTASHOP_VERSION}.zip
+
+# Resmi PrestaShop download linkini kullanın
+PRESTASHOP_URL="https://download.prestashop.com/download/releases/prestashop_${PRESTASHOP_VERSION}.zip"
+wget "$PRESTASHOP_URL" -O prestashop_latest.zip
 check_success "PrestaShop sürümünü indirme"
 
-sudo unzip -o prestashop_${PRESTASHOP_VERSION}.zip -d /var/www/html/prestashop
+sudo unzip -o prestashop_latest.zip -d /var/www/html/prestashop
 check_success "PrestaShop dosyalarını çıkarma"
 
 sudo chown -R www-data:www-data /var/www/html/prestashop
 sudo chmod -R 755 /var/www/html/prestashop
 check_success "PrestaShop dosya izinlerini ayarlama"
 
-# Composer ile bağımlılıkların yüklenmesi
-echo "PrestaShop bağımlılıkları yükleniyor..."
-cd /var/www/html/prestashop
-sudo -u www-data composer install --no-dev
-check_success "Composer bağımlılıklarını yükleme"
+# Composer ile bağımlılıkların yüklenmesi (Bu adımı kaldırabilirsiniz çünkü resmi paket bağımlılıkları içerir)
+# echo "PrestaShop bağımlılıkları yükleniyor..."
+# cd /var/www/html/prestashop
+# sudo -u www-data composer install --no-dev
+# check_success "Composer bağımlılıklarını yükleme"
 
 # phpMyAdmin kurulumu
 echo "phpMyAdmin kuruluyor..."
