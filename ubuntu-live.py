@@ -179,7 +179,7 @@ if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
     check_success "Certbot kurulumu"
 
     echo "SSL sertifikası alınıyor..."
-    sudo certbot --apache -d market.kubilaysen.com -d www.market.kubilaysen.com --non-interactive --agree-tos -m your-email@example.com
+    sudo certbot --apache -d market.kubilaysen.com -d www.market.kubilaysen.com --non-interactive --agree-tos -m kubilaysen1@gmail.com
     check_success "SSL sertifikası kurulumu"
     echo "SSL kurulumu tamamlandı."
 fi
