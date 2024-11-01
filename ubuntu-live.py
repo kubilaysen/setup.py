@@ -21,11 +21,36 @@ check_dns() {
     RESOLVED_IP=$(dig +short $DOMAIN $RECORD_TYPE)
 
     if [ -z "$RESOLVED_IP" ]; then
-        echo "Hata: $DOMAIN için $RECORD_TYPE kaydı bulunamadı."
-        return 1
+        # CNAME kontrolü
+        CNAME=$(dig +short $DOMAIN CNAME)
+        if [ -z "$CNAME" ]; then
+            echo "Hata: $DOMAIN için $RECORD_TYPE kaydı bulunamadı ve CNAME kaydı mevcut değil."
+            return 1
+        else
+            echo "$DOMAIN için CNAME kaydı mevcut: $CNAME"
+            # CNAME hedefinin A kaydını çöz
+            RESOLVED_IP=$(dig +short $CNAME A)
+            if [ -z "$RESOLVED_IP" ]; then
+                echo "Hata: $CNAME için A kaydı bulunamadı."
+                return 1
+            else
+                echo "$CNAME için A kaydı mevcut: $RESOLVED_IP"
+                # Beklenen IP ile karşılaştır
+                if [ "$RESOLVED_IP" != "$EXPECTED_IP" ]; then
+                    echo "Hata: $CNAME için A kaydı beklenen IP ile eşleşmiyor."
+                    return 1
+                fi
+            fi
+        fi
+    else
+        echo "$DOMAIN için $RECORD_TYPE kaydı mevcut: $RESOLVED_IP"
+        # Beklenen IP ile karşılaştır
+        if [ "$RESOLVED_IP" != "$EXPECTED_IP" ]; then
+            echo "Hata: $DOMAIN için $RECORD_TYPE kaydı beklenen IP ile eşleşmiyor."
+            return 1
+        fi
     fi
 
-    echo "$DOMAIN için $RECORD_TYPE kaydı mevcut: $RESOLVED_IP"
     return 0
 }
 
