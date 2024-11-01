@@ -56,8 +56,6 @@ check_dns() {
 
 # Kullanıcıdan gerekli bilgileri al
 read -p "Lütfen sunucunuzun alan adını girin (örnek: market.kubilaysen.com): " DOMAIN
-read -p "Lütfen MySQL root kullanıcısının mevcut şifresini girin: " -s ROOT_PASSWORD
-echo
 read -p "Lütfen 'kubi' kullanıcısı için güçlü bir şifre girin: " -s KUBI_PASSWORD
 echo
 read -p "PrestaShop için PHP'de kullanılacak maksimum dosya yükleme boyutunu girin (örnek: 64M): " UPLOAD_MAX_FILESIZE
@@ -95,12 +93,12 @@ check_success "MySQL kurulumu"
 
 # MySQL root kullanıcısının kimlik doğrulama yöntemini kontrol etme ve değiştirme
 echo "MySQL root kullanıcısının kimlik doğrulama yöntemi kontrol ediliyor..."
-AUTH_PLUGIN=$(sudo mysql -u root -p"$ROOT_PASSWORD" -e "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost';" | tail -n1 2>/dev/null)
+AUTH_PLUGIN=$(sudo mysql -e "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost';" | tail -n1 2>/dev/null)
 
 if [ "$AUTH_PLUGIN" != "mysql_native_password" ]; then
     echo "MySQL root kullanıcısının kimlik doğrulama yöntemi mysql_native_password olarak değiştiriliyor..."
-    sudo mysql -u root <<MYSQL_SCRIPT
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ROOT_PASSWORD';
+    sudo mysql <<MYSQL_SCRIPT
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'RootPassword123!';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
     check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme"
@@ -112,8 +110,8 @@ sudo mysql_secure_installation <<EOF
 
 y
 y
-$ROOT_PASSWORD
-$ROOT_PASSWORD
+RootPassword123!
+RootPassword123!
 y
 y
 y
@@ -123,7 +121,7 @@ check_success "MySQL güvenlik yapılandırması"
 
 # MySQL veritabanı ve kullanıcı ayarları
 echo "MySQL veritabanı ve kullanıcı ayarları yapılıyor..."
-sudo mysql -u root -p"$ROOT_PASSWORD" <<MYSQL_SCRIPT
+sudo mysql <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 DROP USER IF EXISTS 'kubi'@'localhost';
