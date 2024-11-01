@@ -200,8 +200,8 @@ sudo mysql -u root -p"$NEW_ROOT_PASSWORD" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 DROP USER IF EXISTS 'kubi'@'localhost';
-CREATE USER 'kubi'@'localhost' IDENTIFIED BY 'Ks856985.,';
-GRANT ALL PRIVILEGES ON prestashop_db.* TO 'kubi'@'localhost';
+CREATE USER 'kubi'@'127.0.0.1' IDENTIFIED BY 'Ks856985.,';
+GRANT ALL PRIVILEGES ON prestashop_db.* TO 'kubi'@'127.0.0.1';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 check_success "MySQL veritabanı ve kullanıcı ayarları"
@@ -240,6 +240,21 @@ sudo bash -c 'cat > /etc/apache2/sites-available/prestashop.conf <<EOL
     ErrorLog ${APACHE_LOG_DIR}/prestashop_error.log
     CustomLog ${APACHE_LOG_DIR}/prestashop_access.log combined
 </VirtualHost>
+
+<VirtualHost *:80>
+    ServerName kubilaysen.com
+    ServerAlias www.kubilaysen.com
+    DocumentRoot /var/www/html/kubilaysen
+
+    <Directory /var/www/html/kubilaysen>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/kubilaysen_error.log
+    CustomLog ${APACHE_LOG_DIR}/kubilaysen_access.log combined
+</VirtualHost>
 EOL'
 check_success "Apache sanal ana bilgisayar yapılandırması"
 
@@ -248,6 +263,13 @@ sudo a2ensite prestashop.conf
 sudo systemctl reload apache2
 check_success "Apache yapılandırmasını etkinleştirme ve yeniden yükleme"
 
+# Webroot dizinleri oluşturma
+echo "Webroot dizinleri oluşturuluyor..."
+sudo mkdir -p /var/www/html/kubilaysen
+sudo chown -R www-data:www-data /var/www/html/kubilaysen
+sudo chmod -R 755 /var/www/html/kubilaysen
+check_success "Webroot dizinlerinin oluşturulması"
+
 # HTTPS için Let's Encrypt kurulumu (Opsiyonel)
 read -p "HTTPS (SSL) kurulumu yapmak istiyor musunuz? [y/N]: " ssl_choice
 if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
@@ -255,6 +277,8 @@ if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
     echo "DNS kayıtları kontrol ediliyor..."
     check_dns "market.kubilaysen.com" "A" "212.64.217.151" || exit 1
     check_dns "www.market.kubilaysen.com" "A" "212.64.217.151" || exit 1
+    check_dns "kubilaysen.com" "A" "212.64.217.151" || exit 1
+    check_dns "www.kubilaysen.com" "A" "212.64.217.151" || exit 1
 
     echo "Certbot kuruluyor..."
     sudo apt install -y certbot python3-certbot-apache
@@ -268,7 +292,7 @@ if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
     fi
 
     echo "SSL sertifikası alınıyor..."
-    sudo certbot --apache -d market.kubilaysen.com -d www.market.kubilaysen.com --non-interactive --agree-tos -m "$user_email" --redirect
+    sudo certbot --apache -d market.kubilaysen.com -d www.market.kubilaysen.com -d kubilaysen.com -d www.kubilaysen.com --non-interactive --agree-tos -m "$user_email" --redirect
     check_success "SSL sertifikası kurulumu"
     echo "SSL kurulumu tamamlandı."
 fi
@@ -407,8 +431,8 @@ fi
 
 # PrestaShop Kurulum Sihirbazını Tamamlama
 echo "Kurulum tamamlandı."
-echo "Tarayıcınızdan http://market.kubilaysen.com/install veya https://market.kubilaysen.com/install adresine giderek PrestaShop kurulum sihirbazını tamamlayın."
+echo "Tarayıcınızdan http://kubilaysen.com/install, http://market.kubilaysen.com/install, https://kubilaysen.com/install veya https://market.kubilaysen.com/install adreslerine giderek PrestaShop kurulum sihirbazını tamamlayın."
 echo "Kurulum sihirbazında Türkçe dilini seçmeyi unutmayın."
-echo "Ayrıca phpMyAdmin'e erişmek için http://market.kubilaysen.com/phpmyadmin veya https://market.kubilaysen.com/phpmyadmin adresini kullanabilirsiniz."
+echo "Ayrıca phpMyAdmin'e erişmek için http://kubilaysen.com/phpmyadmin, https://kubilaysen.com/phpmyadmin, http://market.kubilaysen.com/phpmyadmin veya https://market.kubilaysen.com/phpmyadmin adreslerini kullanabilirsiniz."
 echo "PrestaShop kurulumunu tamamladıktan sonra güvenlik için 'install' klasörünü silmeyi unutmayın:"
 echo "sudo rm -rf /var/www/html/prestashop/install"
