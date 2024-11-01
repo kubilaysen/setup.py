@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Hata ayıklama modu: Betik herhangi bir hata ile karşılaştığında durur
-set -e
+# Hata ayıklama modu: Betik herhangi bir hata ile karşılaştığında durur ve adımları gösterir
+set -ex
 
 # Fonksiyon: Hata kontrolü
 check_success() {
@@ -11,7 +11,7 @@ check_success() {
     fi
 }
 
-# Fonksiyon: DNS Kaydı Kontrolü
+# Fonksiyon: DNS Kaydı Kontrolü (A ve CNAME kayıtlarını kontrol eder)
 check_dns() {
     DOMAIN=$1
     RECORD_TYPE=$2
@@ -150,7 +150,7 @@ if [ "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM" ]; then
     rm composer-setup.php
     echo "Composer başarıyla yüklendi."
 else
-    echo "ERROR: Composer checksum doğrulaması başarısız oldu!" >&2
+    echo "HATA: Composer checksum doğrulaması başarısız oldu!" >&2
     rm composer-setup.php
     exit 1
 fi
@@ -346,9 +346,10 @@ if [[ "$swap_choice" =~ ^[Yy]$ ]]; then
     echo "Swap alanı oluşturuldu ve etkinleştirildi."
 fi
 
-# Kurulum tamamlandıktan sonra "install" klasörünü kaldırmak için kullanıcıya hatırlatma
+# PrestaShop Kurulum Sihirbazını Tamamlama
 echo "Kurulum tamamlandı."
 echo "Tarayıcınızdan http://market.kubilaysen.com/install veya https://market.kubilaysen.com/install adresine giderek PrestaShop kurulum sihirbazını tamamlayın."
+echo "Kurulum sihirbazında Türkçe dilini seçmeyi unutmayın."
 echo "Ayrıca phpMyAdmin'e erişmek için http://market.kubilaysen.com/phpmyadmin veya https://market.kubilaysen.com/phpmyadmin adresini kullanabilirsiniz."
-echo "PrestaShop kurulumunu tamamladıktan sonra 'install' klasörünü silmeyi unutmayın:"
+echo "PrestaShop kurulumunu tamamladıktan sonra güvenlik için 'install' klasörünü silmeyi unutmayın:"
 echo "sudo rm -rf /var/www/html/prestashop/install"
