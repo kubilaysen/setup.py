@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Hata ayıklama modu: Betik herhangi bir hata ile karşılaştığında durur ve adımları gösterir
+# Hata ayıklama modu: Betik çalışırken adımları gösterir ve hata alırsa durur
 set -ex
 
 # Fonksiyon: Hata kontrolü
@@ -96,36 +96,30 @@ sudo apt autoremove -y
 sudo apt autoclean -y
 check_success "Gereksiz paketleri temizleme"
 
-# PHP PPA'sını ekleyerek en son PHP sürümlerine erişim sağlamak
-echo "Ondřej Surý PPA'sı ekleniyor..."
-sudo apt install -y software-properties-common
-sudo locale-gen C.UTF-8
-sudo update-locale LANG=C.UTF-8
+# PHP 7.2 Kurulumu ve Ayarları
+echo "PHP 7.2 kuruluyor..."
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt update
 check_success "PHP PPA'sı ekleme"
 
-# Gerekli PHP sürümünü belirleme (8.1 veya daha üstü)
-PHP_VERSION=8.1
-echo "PHP $PHP_VERSION kuruluyor..."
-sudo apt install -y php$PHP_VERSION libapache2-mod-php$PHP_VERSION \
-    php$PHP_VERSION-mysql php$PHP_VERSION-curl php$PHP_VERSION-gd \
-    php$PHP_VERSION-mbstring php$PHP_VERSION-intl php$PHP_VERSION-xml \
-    php$PHP_VERSION-zip php$PHP_VERSION-soap php$PHP_VERSION-cli \
-    php$PHP_VERSION-common php$PHP_VERSION-opcache \
-    php$PHP_VERSION-readline unzip curl git
-check_success "PHP $PHP_VERSION ve gerekli uzantıların kurulumu"
+sudo apt install -y php7.2 libapache2-mod-php7.2 \
+    php7.2-mysql php7.2-curl php7.2-gd \
+    php7.2-mbstring php7.2-intl php7.2-xml \
+    php7.2-zip php7.2-soap php7.2-cli \
+    php7.2-common php7.2-opcache \
+    php7.2-readline unzip curl git
+check_success "PHP 7.2 ve gerekli uzantıların kurulumu"
 
 # Gerekli PHP uzantılarının etkinleştirilmesi
 echo "Gerekli PHP uzantıları etkinleştiriliyor..."
-sudo phpenmod -v $PHP_VERSION mbstring
-sudo phpenmod -v $PHP_VERSION intl
-sudo phpenmod -v $PHP_VERSION gd
-sudo phpenmod -v $PHP_VERSION curl
-sudo phpenmod -v $PHP_VERSION zip
-sudo phpenmod -v $PHP_VERSION xml
-sudo phpenmod -v $PHP_VERSION soap
-sudo phpenmod -v $PHP_VERSION opcache
+sudo phpenmod -v 7.2 mbstring
+sudo phpenmod -v 7.2 intl
+sudo phpenmod -v 7.2 gd
+sudo phpenmod -v 7.2 curl
+sudo phpenmod -v 7.2 zip
+sudo phpenmod -v 7.2 xml
+sudo phpenmod -v 7.2 soap
+sudo phpenmod -v 7.2 opcache
 check_success "PHP uzantılarını etkinleştirme"
 
 # Apache için gerekli modüllerin etkinleştirilmesi
@@ -134,10 +128,12 @@ sudo a2enmod rewrite
 sudo a2enmod ssl
 check_success "Apache modüllerini etkinleştirme"
 
-# Apache'yi yeniden başlatma
-echo "Apache yeniden başlatılıyor..."
+# Apache'yi PHP 7.2 ile yeniden başlatma
+echo "Apache yeniden başlatılıyor ve PHP 7.2 ile çalıştırılıyor..."
+sudo a2dismod php8.1 || true  # Eğer PHP 8.1 etkinse devre dışı bırak
+sudo a2enmod php7.2
 sudo systemctl restart apache2
-check_success "Apache yeniden başlatma"
+check_success "Apache yeniden başlatma ve PHP 7.2 ile çalıştırma"
 
 # Composer kurulumu
 echo "Composer kuruluyor..."
@@ -180,7 +176,7 @@ check_success "MySQL veritabanı ve kullanıcı ayarları"
 
 # PHP ayarlarının yapılması
 echo "PHP ayarları düzenleniyor..."
-PHP_INI="/etc/php/$PHP_VERSION/apache2/php.ini"
+PHP_INI="/etc/php/7.2/apache2/php.ini"
 
 sudo sed -i 's/memory_limit = .*/memory_limit = 256M/' $PHP_INI
 sudo sed -i 's/upload_max_filesize = .*/upload_max_filesize = 64M/' $PHP_INI
@@ -279,6 +275,29 @@ check_success "PrestaShop dosyalarını çıkarma"
 sudo chown -R www-data:www-data /var/www/html/prestashop
 sudo chmod -R 755 /var/www/html/prestashop
 check_success "PrestaShop dosya izinlerini ayarlama"
+
+# config/defines.inc.php dosyasını düzenleme (Türkçe dil hatası için)
+echo "config/defines.inc.php dosyası düzenleniyor..."
+CONFIG_FILE="/var/www/html/prestashop/config/defines.inc.php"
+
+if [ -f "$CONFIG_FILE" ]; then
+    sudo sed -i 's/^define.*LCTYPE_.*$/\/\/&/' "$CONFIG_FILE"
+    check_success "config/defines.inc.php dosyasını düzenleme"
+else
+    echo "Hata: $CONFIG_FILE dosyası bulunamadı." >&2
+    exit 1
+fi
+
+# /var/cache/prod dizinini temizleme (Klasörü silme!)
+echo "/var/cache/prod dizini temizleniyor..."
+CACHE_DIR="/var/www/html/prestashop/var/cache/prod"
+
+if [ -d "$CACHE_DIR" ]; then
+    sudo rm -rf ${CACHE_DIR:?}/*
+    check_success "/var/cache/prod dizinini temizleme"
+else
+    echo "Uyarı: $CACHE_DIR dizini bulunamadı. Devam ediliyor..."
+fi
 
 # phpMyAdmin kurulumu
 echo "phpMyAdmin kuruluyor..."
