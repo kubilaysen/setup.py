@@ -11,6 +11,24 @@ check_success() {
     fi
 }
 
+# Fonksiyon: DNS Kaydı Kontrolü
+check_dns() {
+    DOMAIN=$1
+    RECORD_TYPE=$2
+    EXPECTED_IP=$3
+
+    echo "DNS kontrolü: $DOMAIN ($RECORD_TYPE)"
+    RESOLVED_IP=$(dig +short $DOMAIN $RECORD_TYPE)
+
+    if [ -z "$RESOLVED_IP" ]; then
+        echo "Hata: $DOMAIN için $RECORD_TYPE kaydı bulunamadı."
+        return 1
+    fi
+
+    echo "$DOMAIN için $RECORD_TYPE kaydı mevcut: $RESOLVED_IP"
+    return 0
+}
+
 # Kullanıcıdan sudo şifresini başta bir kez istemek için
 sudo -v
 
@@ -174,6 +192,11 @@ check_success "Apache yapılandırmasını etkinleştirme ve yeniden yükleme"
 # HTTPS için Let's Encrypt kurulumu (Opsiyonel)
 read -p "HTTPS (SSL) kurulumu yapmak istiyor musunuz? [y/N]: " ssl_choice
 if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
+    # DNS kayıtlarının kontrol edilmesi
+    echo "DNS kayıtları kontrol ediliyor..."
+    check_dns "market.kubilaysen.com" "A" "212.64.217.151" || exit 1
+    check_dns "www.market.kubilaysen.com" "A" "212.64.217.151" || exit 1
+
     echo "Certbot kuruluyor..."
     sudo apt install -y certbot python3-certbot-apache
     check_success "Certbot kurulumu"
