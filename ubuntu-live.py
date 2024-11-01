@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Hata ayıklama modu
+# Hata ayıklama modu: Betik herhangi bir hata ile karşılaştığında durur
 set -e
 
 # Fonksiyon: Hata kontrolü
@@ -23,26 +23,26 @@ check_success "Sistem güncellemesi"
 echo "Mevcut Apache, PHP, MySQL ve phpMyAdmin kurulumları temizleniyor..."
 
 # Apache'yi durdur ve kaldır
-sudo systemctl stop apache2
+sudo systemctl stop apache2 || true
 sudo a2dissite *.conf || true
-sudo apt purge -y apache2 apache2-utils apache2-bin apache2.2-common
+sudo apt purge -y apache2 apache2-utils apache2-bin apache2.2-common || true
 sudo apt autoremove -y
 check_success "Apache kaldırma"
 
 # PHP'yi kaldır
-sudo apt purge -y 'php*'
+sudo apt purge -y 'php*' || true
 sudo apt autoremove -y
 check_success "PHP kaldırma"
 
 # MySQL'i kaldır
-sudo systemctl stop mysql
-sudo apt purge -y mysql-server mysql-client mysql-common
+sudo systemctl stop mysql || true
+sudo apt purge -y mysql-server mysql-client mysql-common || true
 sudo rm -rf /etc/mysql /var/lib/mysql
 sudo apt autoremove -y
 check_success "MySQL kaldırma"
 
 # phpMyAdmin'i kaldır
-sudo apt purge -y phpmyadmin
+sudo apt purge -y phpmyadmin || true
 sudo rm -rf /usr/share/phpmyadmin
 sudo rm -rf /etc/phpmyadmin
 sudo rm -rf /var/lib/phpmyadmin
@@ -56,6 +56,8 @@ check_success "Gereksiz paketleri temizleme"
 # PHP PPA'sını ekleyerek en son PHP sürümlerine erişim sağlamak
 echo "Ondřej Surý PPA'sı ekleniyor..."
 sudo apt install -y software-properties-common
+sudo locale-gen C.UTF-8
+sudo update-locale LANG=C.UTF-8
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt update
 check_success "PHP PPA'sı ekleme"
@@ -67,7 +69,7 @@ sudo apt install -y php$PHP_VERSION libapache2-mod-php$PHP_VERSION \
     php$PHP_VERSION-mysql php$PHP_VERSION-curl php$PHP_VERSION-gd \
     php$PHP_VERSION-mbstring php$PHP_VERSION-intl php$PHP_VERSION-xml \
     php$PHP_VERSION-zip php$PHP_VERSION-soap php$PHP_VERSION-cli \
-    php$PHP_VERSION-common php$PHP_VERSION-json php$PHP_VERSION-opcache \
+    php$PHP_VERSION-common php$PHP_VERSION-opcache \
     php$PHP_VERSION-readline unzip curl git
 check_success "PHP $PHP_VERSION ve gerekli uzantıların kurulumu"
 
@@ -83,7 +85,7 @@ sudo phpenmod -v $PHP_VERSION soap
 sudo phpenmod -v $PHP_VERSION opcache
 check_success "PHP uzantılarını etkinleştirme"
 
-# Apache yapılandırması için gerekli modüllerin etkinleştirilmesi
+# Apache için gerekli modüllerin etkinleştirilmesi
 echo "Apache için gerekli modüller etkinleştiriliyor..."
 sudo a2enmod rewrite
 sudo a2enmod ssl
