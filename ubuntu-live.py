@@ -205,32 +205,32 @@ fi
 
 echo "Bulunan en son PrestaShop sürümü: $PRESTASHOP_VERSION"
 
-# Etiketin 'v' ile başladığından emin olun
-if [[ "$PRESTASHOP_VERSION" != v* ]]; then
-    echo "Hata: PrestaShop sürüm etiketi 'v' ile başlamıyor." >&2
+# Etiketin 'v' ile başlamadığını kontrol et ve uygun şekilde işleme al
+if [[ "$PRESTASHOP_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # Etiket 'v' ile başlıyorsa, 'v' önekini kaldır
+    VERSION="${PRESTASHOP_VERSION#v}"
+    PRESTASHOP_URL="https://github.com/PrestaShop/PrestaShop/releases/download/${PRESTASHOP_VERSION}/prestashop_${VERSION}.zip"
+elif [[ "$PRESTASHOP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # Etiket 'v' ile başlamıyorsa, doğrudan sürüm numarasını kullan
+    VERSION="$PRESTASHOP_VERSION"
+    PRESTASHOP_URL="https://github.com/PrestaShop/PrestaShop/releases/download/${PRESTASHOP_VERSION}/prestashop_${VERSION}.zip"
+else
+    echo "Hata: PrestaShop sürüm etiketi beklenen formatta değil." >&2
     exit 1
 fi
 
-# Sürüm numarasını ayırma (örn. v8.1.0 -> 8.1.0)
-VERSION="${PRESTASHOP_VERSION#v}"
-
-# Resmi PrestaShop download linkini kullanın
-PRESTASHOP_URL="https://github.com/PrestaShop/PrestaShop/releases/download/${PRESTASHOP_VERSION}/prestashop_${VERSION}.zip"
+# PrestaShop'u indir
 wget "$PRESTASHOP_URL" -O prestashop_latest.zip
 check_success "PrestaShop sürümünü indirme"
 
+# PrestaShop dosyalarını çıkarma
 sudo unzip -o prestashop_latest.zip -d /var/www/html/prestashop
 check_success "PrestaShop dosyalarını çıkarma"
 
+# Dosya izinlerini ayarlama
 sudo chown -R www-data:www-data /var/www/html/prestashop
 sudo chmod -R 755 /var/www/html/prestashop
 check_success "PrestaShop dosya izinlerini ayarlama"
-
-# Composer ile bağımlılıkların yüklenmesi (Bu adımı kaldırabilirsiniz çünkü resmi paket bağımlılıkları içerir)
-# echo "PrestaShop bağımlılıkları yükleniyor..."
-# cd /var/www/html/prestashop
-# sudo -u www-data composer install --no-dev
-# check_success "Composer bağımlılıklarını yükleme"
 
 # phpMyAdmin kurulumu
 echo "phpMyAdmin kuruluyor..."
