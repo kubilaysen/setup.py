@@ -57,7 +57,7 @@ check_dns() {
 # Kullanıcıdan sudo şifresini başta bir kez istemek için
 sudo -v
 
-# Sistem güncellemesi ve gerekli paketlerin kurulumu
+# Sistem güncellenmesi ve gerekli paketlerin kurulumu
 echo "Sistem güncelleniyor ve gerekli paketler yükleniyor..."
 sudo apt update && sudo apt upgrade -y
 check_success "Sistem güncellemesi"
@@ -96,12 +96,17 @@ sudo apt autoremove -y
 sudo apt autoclean -y
 check_success "Gereksiz paketleri temizleme"
 
-# PHP 7.2 Kurulumu ve Ayarları
-echo "PHP 7.2 kuruluyor..."
+# PHP PPA'sını ekleyerek en son PHP sürümlerine erişim sağlamak
+echo "Ondřej Surý PPA'sı ekleniyor..."
+sudo apt install -y software-properties-common
+sudo locale-gen C.UTF-8
+sudo update-locale LANG=C.UTF-8
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt update
 check_success "PHP PPA'sı ekleme"
 
+# PHP 7.2 Kurulumu ve Ayarları
+echo "PHP 7.2 kuruluyor..."
 sudo apt install -y php7.2 libapache2-mod-php7.2 \
     php7.2-mysql php7.2-curl php7.2-gd \
     php7.2-mbstring php7.2-intl php7.2-xml \
@@ -164,7 +169,20 @@ sudo mysql_secure_installation
 # MySQL veritabanı ve kullanıcı ayarları
 echo "MySQL veritabanı ve kullanıcı ayarları yapılıyor..."
 echo "Lütfen MySQL root şifrenizi girin:"
-sudo mysql -u root -p <<MYSQL_SCRIPT
+read -s root_password
+
+# Root kullanıcısının kimlik doğrulama yöntemini kontrol et ve gerekirse değiştir
+echo "MySQL root kullanıcısının kimlik doğrulama yöntemi kontrol ediliyor..."
+AUTH_PLUGIN=$(sudo mysql -u root -p"$root_password" -e "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost';" | tail -n1)
+
+if [ "$AUTH_PLUGIN" != "mysql_native_password" ]; then
+    echo "MySQL root kullanıcısının kimlik doğrulama yöntemi mysql_native_password olarak değiştiriliyor..."
+    sudo mysql -u root -p"$root_password" -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'YeniRootSifresi'; FLUSH PRIVILEGES;"
+    check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme"
+fi
+
+# 'kubi' kullanıcısı ve veritabanını oluşturma
+sudo mysql -u root -p"$root_password" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 DROP USER IF EXISTS 'kubi'@'localhost';
@@ -183,6 +201,7 @@ sudo sed -i 's/upload_max_filesize = .*/upload_max_filesize = 64M/' $PHP_INI
 sudo sed -i 's/post_max_size = .*/post_max_size = 64M/' $PHP_INI
 sudo sed -i 's/max_execution_time = .*/max_execution_time = 300/' $PHP_INI
 sudo sed -i 's/max_input_vars = .*/max_input_vars = 10000/' $PHP_INI
+sudo sed -i 's/allow_url_fopen = Off/allow_url_fopen = On/' $PHP_INI
 check_success "PHP ayarlarının düzenlenmesi"
 
 # Apache yapılandırması
