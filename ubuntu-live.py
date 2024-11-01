@@ -44,15 +44,16 @@ echo "Güvenlik duvarı ayarları yapılıyor..."
 sudo ufw allow 'Apache Full'
 sudo ufw --force enable
 check_success "Güvenlik duvarı ayarları"
+echo "Firewall is active and enabled on system startup"
 
 # MySQL'i kurma
 echo "MySQL kuruluyor..."
 sudo apt install -y mysql-server
 check_success "MySQL kurulumu"
 
-# MySQL root kullanıcısı ile şifre ile bağlanarak kimlik doğrulama yöntemini değiştirme
+# MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme ve şifre belirleme
 echo "MySQL root kullanıcısının kimlik doğrulama yöntemi değiştiriliyor..."
-sudo mysql -u root -p"${ROOT_PASSWORD}" <<MYSQL_SCRIPT
+sudo mysql <<MYSQL_SCRIPT
 ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
@@ -60,7 +61,7 @@ check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini deği�
 
 # MySQL güvenlik yapılandırması (Anonim kullanıcıları kaldırma, test veritabanını silme vb.)
 echo "MySQL güvenlik yapılandırması yapılıyor..."
-sudo mysql -u root -p"${ROOT_PASSWORD}" <<MYSQL_SCRIPT
+sudo mysql <<MYSQL_SCRIPT
 -- Remove anonymous users
 DELETE FROM mysql.user WHERE User='';
 -- Disallow root login remotely
@@ -74,7 +75,7 @@ check_success "MySQL güvenlik yapılandırması"
 
 # MySQL veritabanı ve kullanıcı ayarları
 echo "MySQL veritabanı ve kullanıcı ayarları yapılıyor..."
-sudo mysql -u root -p"${ROOT_PASSWORD}" <<MYSQL_SCRIPT
+sudo mysql <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 DROP USER IF EXISTS 'kubi'@'localhost';
@@ -91,7 +92,7 @@ check_success "MySQL 'kubi' kullanıcısı ile bağlantı testi"
 
 # PHP'yi kurma ve gerekli uzantıları yükleme
 echo "PHP kuruluyor ve gerekli uzantılar yükleniyor..."
-sudo apt install -y php libapache2-mod-php php-mysql php-curl php-gd php-mbstring php-intl php-xml php-zip php-soap
+sudo apt install -y php libapache2-mod-php php-mysql php-curl php-gd php-mbstring php-intl php-xml php-zip php-soap unzip wget
 check_success "PHP ve uzantılar kurulumu"
 
 # PHP ayarlarını yapılandırma
