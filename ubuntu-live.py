@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Hata ayıklama modu: Betik çalışırken adımları gösterir ve hata alırsa durur
-set -ex
+set -e
 
 # Fonksiyon: Hata kontrolü
 check_success() {
@@ -170,6 +170,7 @@ sudo mysql_secure_installation
 echo "MySQL veritabanı ve kullanıcı ayarları yapılıyor..."
 echo "Lütfen MySQL root şifrenizi girin:"
 read -s root_password
+echo
 
 # Root kullanıcısının kimlik doğrulama yöntemini kontrol et ve gerekirse değiştir
 echo "MySQL root kullanıcısının kimlik doğrulama yöntemi kontrol ediliyor..."
@@ -189,9 +190,12 @@ if [ "$AUTH_PLUGIN" != "mysql_native_password" ]; then
     # Parola politikasını geri eski haline getir
     sudo mysql -u root -p"$NEW_ROOT_PASSWORD" -e "SET GLOBAL validate_password.policy = MEDIUM; SET GLOBAL validate_password.length = 8; SET GLOBAL validate_password.number_count = 1; SET GLOBAL validate_password.special_char_count = 1;"
     check_success "Parola politikasını geri yükleme"
+else
+    NEW_ROOT_PASSWORD="$root_password"
 fi
 
 # 'kubi' kullanıcısı ve veritabanını oluşturma
+echo "'kubi' kullanıcısı ve 'prestashop_db' veritabanı oluşturuluyor..."
 sudo mysql -u root -p"$NEW_ROOT_PASSWORD" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS prestashop_db;
 CREATE DATABASE prestashop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
@@ -201,6 +205,11 @@ GRANT ALL PRIVILEGES ON prestashop_db.* TO 'kubi'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 check_success "MySQL veritabanı ve kullanıcı ayarları"
+
+# MySQL bağlantısını test etme
+echo "MySQL bağlantısını test ediyor..."
+mysql -u kubi -pKs856985., -h 127.0.0.1 prestashop_db -e "SELECT DATABASE();"
+check_success "MySQL 'kubi' kullanıcısı ile bağlantı testi"
 
 # PHP ayarlarının yapılması
 echo "PHP ayarları düzenleniyor..."
@@ -297,12 +306,14 @@ wget "$PRESTASHOP_URL" -O prestashop_latest.zip
 check_success "PrestaShop sürümünü indirme"
 
 # PrestaShop dosyalarını çıkarma
+sudo mkdir -p /var/www/html/prestashop
 sudo unzip -o prestashop_latest.zip -d /var/www/html/prestashop
 check_success "PrestaShop dosyalarını çıkarma"
 
 # Dosya izinlerini ayarlama
 sudo chown -R www-data:www-data /var/www/html/prestashop
-sudo chmod -R 755 /var/www/html/prestashop
+sudo find /var/www/html/prestashop -type d -exec chmod 755 {} \;
+sudo find /var/www/html/prestashop -type f -exec chmod 644 {} \;
 check_success "PrestaShop dosya izinlerini ayarlama"
 
 # config/defines.inc.php dosyasını düzenleme (Türkçe dil hatası için)
@@ -322,7 +333,7 @@ echo "/var/cache/prod dizini temizleniyor..."
 CACHE_DIR="/var/www/html/prestashop/var/cache/prod"
 
 if [ -d "$CACHE_DIR" ]; then
-    sudo rm -rf ${CACHE_DIR:?}/*
+    sudo rm -rf "${CACHE_DIR:?}/"*
     check_success "/var/cache/prod dizinini temizleme"
 else
     echo "Uyarı: $CACHE_DIR dizini bulunamadı. Devam ediliyor..."
