@@ -93,13 +93,16 @@ echo "MySQL kuruluyor..."
 sudo apt install -y mysql-server
 check_success "MySQL kurulumu"
 
-# MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme
+# MySQL root kullanıcısının kimlik doğrulama yöntemini kontrol etme ve değiştirme
 echo "MySQL root kullanıcısının kimlik doğrulama yöntemi kontrol ediliyor..."
-AUTH_PLUGIN=$(sudo mysql -u root -p"$ROOT_PASSWORD" -e "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost';" | tail -n1)
+AUTH_PLUGIN=$(sudo mysql -u root -p"$ROOT_PASSWORD" -e "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost';" | tail -n1 2>/dev/null)
 
 if [ "$AUTH_PLUGIN" != "mysql_native_password" ]; then
     echo "MySQL root kullanıcısının kimlik doğrulama yöntemi mysql_native_password olarak değiştiriliyor..."
-    sudo mysql -u root -p"$ROOT_PASSWORD" -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ROOT_PASSWORD'; FLUSH PRIVILEGES;"
+    sudo mysql -u root <<MYSQL_SCRIPT
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ROOT_PASSWORD';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
     check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme"
 fi
 
@@ -144,7 +147,7 @@ check_success "PHP ve uzantılar kurulumu"
 echo "PHP ayarları düzenleniyor..."
 PHP_INI="/etc/php/7.4/apache2/php.ini"
 
-sudo sed -i "s/memory_limit = .*/memory_limit = $MEMORY_LIMIT/" $PHP_INI
+sudo sed -i "s/memory_limit = .*/memory_limit = 256M/" $PHP_INI
 sudo sed -i "s/upload_max_filesize = .*/upload_max_filesize = $UPLOAD_MAX_FILESIZE/" $PHP_INI
 sudo sed -i "s/post_max_size = .*/post_max_size = $POST_MAX_SIZE/" $PHP_INI
 sudo sed -i "s/max_execution_time = .*/max_execution_time = $MAX_EXECUTION_TIME/" $PHP_INI
@@ -167,7 +170,7 @@ echo "phpMyAdmin kuruluyor..."
 sudo apt install -y phpmyadmin
 check_success "phpMyAdmin kurulumu"
 
-# phpMyAdmin Apache ile entegre etme
+# phpMyAdmin için Apache ile entegrasyon
 echo "phpMyAdmin Apache ile entegre ediliyor..."
 sudo phpenmod mbstring
 sudo systemctl restart apache2
@@ -278,16 +281,17 @@ EOL"
 sudo systemctl reload apache2
 check_success "Apache yeniden yükleme"
 
-# phpMyAdmin kurulumu ve yapılandırması
-echo "phpMyAdmin kuruluyor ve yapılandırılıyor..."
-sudo apt install -y phpmyadmin
-check_success "phpMyAdmin kurulumu"
-
-# phpMyAdmin için Apache yapılandırmasını etkinleştirme
-echo "phpMyAdmin Apache ile entegre ediliyor..."
-sudo phpenmod mbstring
-sudo systemctl restart apache2
-check_success "phpMyAdmin Apache ile entegrasyonu"
+# phpMyAdmin için güvenlik ayarları (Opsiyonel)
+read -p "phpMyAdmin'e ek güvenlik önlemleri eklemek istiyor musunuz? [y/N]: " phpmyadmin_security
+if [[ "$phpmyadmin_security" =~ ^[Yy]$ ]]; then
+    echo "phpMyAdmin'e ek güvenlik önlemleri ekleniyor..."
+    # Örneğin, sadece belirli IP adreslerinden erişim sağlamak için
+    read -p "phpMyAdmin'e sadece hangi IP adresinden erişim sağlanacak? (örn: 123.456.789.0): " ALLOWED_IP
+    sudo sed -i "/<Directory \/usr\/share\/phpmyadmin>/a \ \ \ \ Require ip $ALLOWED_IP" /etc/apache2/conf-available/phpmyadmin.conf
+    sudo systemctl reload apache2
+    check_success "phpMyAdmin güvenlik ayarları"
+    echo "phpMyAdmin'e sadece belirtilen IP adresinden erişim sağlanacaktır."
+fi
 
 # Test PHP işleme
 echo "PHP işleme testi yapılıyor..."
@@ -298,28 +302,32 @@ echo "Lütfen tarayıcınızda http://$DOMAIN/info.php adresine gidin ve PHP'nin
 echo "Eğer doğru çalışıyorsa, info.php dosyasını silmek için aşağıdaki komutu kullanabilirsiniz:"
 echo "sudo rm $WEB_ROOT/info.php"
 
-# phpMyAdmin için güvenlik ayarları (Opsiyonel)
-read -p "phpMyAdmin'e ek güvenlik önlemleri eklemek istiyor musunuz? [y/N]: " phpmyadmin_security
-if [[ "$phpmyadmin_security" =~ ^[Yy]$ ]]; then
-    echo "phpMyAdmin'e ek güvenlik önlemleri ekleniyor..."
-    sudo sed -i "s/Require all granted/Require ip YOUR_IP_ADDRESS/" /etc/apache2/conf-available/phpmyadmin.conf
-    sudo systemctl reload apache2
-    check_success "phpMyAdmin güvenlik ayarları"
-    echo "phpMyAdmin'e sadece belirtilen IP adresinden erişim sağlanacaktır."
-fi
+# PrestaShop için PHP test dosyası oluşturma
+echo "PrestaShop için PHP test dosyası oluşturuluyor..."
+echo "<?php
+\$user = 'kubi';
+\$password = '$KUBI_PASSWORD';
+\$database = 'prestashop_db';
+\$table = 'todo_list';
 
-# PrestaShop kurulum sihirbazını tamamlama
-echo "PrestaShop kurulumu tamamlandı."
-echo "Tarayıcınızdan http://$DOMAIN/install adresine giderek PrestaShop kurulum sihirbazını tamamlayın."
-echo "Kurulum sırasında aşağıdaki veritabanı bilgilerini kullanın:"
-echo "-------------------------------------------"
-echo "Database server address: 127.0.0.1"
-echo "Database name: prestashop_db"
-echo "Database login: kubi"
-echo "Database password: [Belirlediğiniz Şifre]"
-echo "Tables prefix: ps_"
-echo "-------------------------------------------"
-echo "Kurulum tamamlandıktan sonra güvenlik için 'install' klasörünü silmeyi unutmayın:"
+try {
+  \$db = new PDO(\"mysql:host=127.0.0.1;dbname=\$database\", \$user, \$password);
+  echo \"<h2>TODO</h2><ol>\";
+  foreach(\$db->query(\"SELECT content FROM \$table\") as \$row) {
+    echo \"<li>\" . \$row['content'] . \"</li>\";
+  }
+  echo \"</ol>\";
+} catch (PDOException \$e) {
+    print \"Error!: \" . \$e->getMessage() . \"<br/>\";
+    die();
+}
+?>" > $WEB_ROOT/todo_list.php
+check_success "PrestaShop todo_list.php dosyası oluşturma"
+
+echo "PrestaShop için test dosyası oluşturuldu. Lütfen tarayıcınızda http://$DOMAIN/todo_list.php adresine giderek veritabanı bağlantısını test edin."
+
+# PrestaShop kurulumu tamamlandıktan sonra güvenlik için 'install' klasörünü silme
+echo "PrestaShop kurulumunu tamamladıktan sonra güvenlik için 'install' klasörünü silmeyi unutmayın:"
 echo "sudo rm -rf $WEB_ROOT/install"
 
 # Ekstra: Swap alanı oluşturma (Opsiyonel)
