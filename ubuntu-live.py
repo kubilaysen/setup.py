@@ -194,7 +194,9 @@ fi
 # PrestaShop'u İndirme ve Kurma
 echo "PrestaShop indiriliyor ve kuruluyor..."
 cd /tmp
-PRESTASHOP_VERSION=$(curl -s https://api.github.com/repos/PrestaShop/PrestaShop/releases/latest | grep tag_name | cut -d '"' -f4)
+
+# Mevcut en son sürümü manuel olarak belirleyin, örneğin 8.1.0
+PRESTASHOP_VERSION=8.1.0
 
 # Resmi PrestaShop download linkini kullanın
 PRESTASHOP_URL="https://download.prestashop.com/download/releases/prestashop_${PRESTASHOP_VERSION}.zip"
