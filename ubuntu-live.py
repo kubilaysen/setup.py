@@ -178,8 +178,15 @@ if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
     sudo apt install -y certbot python3-certbot-apache
     check_success "Certbot kurulumu"
 
+    # Kullanıcıdan geçerli bir e-posta adresi girmesini isteyin
+    read -p "Lütfen SSL sertifikası için geçerli bir e-posta adresi girin: " user_email
+    if [[ ! "$user_email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+        echo "Hata: Geçersiz bir e-posta adresi girdiniz." >&2
+        exit 1
+    fi
+
     echo "SSL sertifikası alınıyor..."
-    sudo certbot --apache -d market.kubilaysen.com -d www.market.kubilaysen.com --non-interactive --agree-tos -m kubilaysen1@gmail.com
+    sudo certbot --apache -d market.kubilaysen.com -d www.market.kubilaysen.com --non-interactive --agree-tos -m "$user_email" --redirect
     check_success "SSL sertifikası kurulumu"
     echo "SSL kurulumu tamamlandı."
 fi
