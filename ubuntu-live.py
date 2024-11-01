@@ -196,7 +196,7 @@ echo "PrestaShop indiriliyor ve kuruluyor..."
 cd /tmp
 
 # PrestaShop'un en son sürümünü dinamik olarak tespit edin
-PRESTASHOP_VERSION=$(curl -s https://download.prestashop.com/download/releases/ | grep -oP 'prestashop_\K[0-9]+\.[0-9]+\.[0-9]+(?=.zip)' | head -n 1)
+PRESTASHOP_VERSION=$(curl -s https://api.github.com/repos/PrestaShop/PrestaShop/releases/latest | grep tag_name | cut -d '"' -f4)
 
 if [ -z "$PRESTASHOP_VERSION" ]; then
     echo "Hata: En son PrestaShop sürümü bulunamadı." >&2
@@ -205,8 +205,17 @@ fi
 
 echo "Bulunan en son PrestaShop sürümü: $PRESTASHOP_VERSION"
 
+# Etiketin 'v' ile başladığından emin olun
+if [[ "$PRESTASHOP_VERSION" != v* ]]; then
+    echo "Hata: PrestaShop sürüm etiketi 'v' ile başlamıyor." >&2
+    exit 1
+fi
+
+# Sürüm numarasını ayırma (örn. v8.1.0 -> 8.1.0)
+VERSION="${PRESTASHOP_VERSION#v}"
+
 # Resmi PrestaShop download linkini kullanın
-PRESTASHOP_URL="https://download.prestashop.com/download/releases/prestashop_${PRESTASHOP_VERSION}.zip"
+PRESTASHOP_URL="https://github.com/PrestaShop/PrestaShop/releases/download/${PRESTASHOP_VERSION}/prestashop_${VERSION}.zip"
 wget "$PRESTASHOP_URL" -O prestashop_latest.zip
 check_success "PrestaShop sürümünü indirme"
 
