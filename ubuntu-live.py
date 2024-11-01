@@ -98,30 +98,30 @@ sudo apt autoremove -y
 sudo apt autoclean -y
 check_success "Gereksiz paketleri temizleme"
 
-# PHP 7.2 Kurulumu ve Ayarları
-echo "PHP 7.2 kuruluyor..."
+# PHP 7.4 Kurulumu ve Ayarları
+echo "PHP 7.4 kuruluyor..."
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt update
 check_success "PHP PPA'sı ekleme"
 
-sudo apt install -y php7.2 libapache2-mod-php7.2 \
-    php7.2-mysql php7.2-curl php7.2-gd \
-    php7.2-mbstring php7.2-intl php7.2-xml \
-    php7.2-zip php7.2-soap php7.2-cli \
-    php7.2-common php7.2-opcache \
-    php7.2-readline unzip curl git
-check_success "PHP 7.2 ve gerekli uzantıların kurulumu"
+sudo apt install -y php7.4 libapache2-mod-php7.4 \
+    php7.4-mysql php7.4-curl php7.4-gd \
+    php7.4-mbstring php7.4-intl php7.4-xml \
+    php7.4-zip php7.4-soap php7.4-cli \
+    php7.4-common php7.4-opcache \
+    php7.4-readline unzip curl git
+check_success "PHP 7.4 ve gerekli uzantıların kurulumu"
 
 # Gerekli PHP uzantılarının etkinleştirilmesi
 echo "Gerekli PHP uzantıları etkinleştiriliyor..."
-sudo phpenmod -v 7.2 mbstring
-sudo phpenmod -v 7.2 intl
-sudo phpenmod -v 7.2 gd
-sudo phpenmod -v 7.2 curl
-sudo phpenmod -v 7.2 zip
-sudo phpenmod -v 7.2 xml
-sudo phpenmod -v 7.2 soap
-sudo phpenmod -v 7.2 opcache
+sudo phpenmod -v 7.4 mbstring
+sudo phpenmod -v 7.4 intl
+sudo phpenmod -v 7.4 gd
+sudo phpenmod -v 7.4 curl
+sudo phpenmod -v 7.4 zip
+sudo phpenmod -v 7.4 xml
+sudo phpenmod -v 7.4 soap
+sudo phpenmod -v 7.4 opcache
 check_success "PHP uzantılarını etkinleştirme"
 
 # Apache için gerekli modüllerin etkinleştirilmesi
@@ -130,15 +130,15 @@ sudo a2enmod rewrite
 sudo a2enmod ssl
 check_success "Apache modüllerini etkinleştirme"
 
-# Apache'yi PHP 7.2 ile yeniden başlatma
-echo "Apache yeniden başlatılıyor ve PHP 7.2 ile çalıştırılıyor..."
+# Apache'yi PHP 7.4 ile yeniden başlatma
+echo "Apache yeniden başlatılıyor ve PHP 7.4 ile çalıştırılıyor..."
 # PHP 8.1 modülü mevcut değilse hata vermemesi için kontrol ekleyelim
 if sudo a2query -m php8.1 > /dev/null 2>&1; then
     sudo a2dismod php8.1 || true
 fi
-sudo a2enmod php7.2
+sudo a2enmod php7.4
 sudo systemctl restart apache2
-check_success "Apache yeniden başlatma ve PHP 7.2 ile çalıştırma"
+check_success "Apache yeniden başlatma ve PHP 7.4 ile çalıştırma"
 
 # Composer kurulumu
 echo "Composer kuruluyor..."
@@ -189,7 +189,7 @@ check_success "MySQL veritabanı ve kullanıcı ayarları"
 
 # PHP ayarlarının yapılması
 echo "PHP ayarları düzenleniyor..."
-PHP_INI="/etc/php/7.2/apache2/php.ini"
+PHP_INI="/etc/php/7.4/apache2/php.ini"
 
 sudo sed -i 's/memory_limit = .*/memory_limit = 256M/' $PHP_INI
 sudo sed -i 's/upload_max_filesize = .*/upload_max_filesize = 64M/' $PHP_INI
