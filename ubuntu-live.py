@@ -11,51 +11,10 @@ check_success() {
     fi
 }
 
-# Fonksiyon: DNS Kaydı Kontrolü (A ve CNAME kayıtlarını kontrol eder)
-check_dns() {
-    DOMAIN=$1
-    RECORD_TYPE=$2
-    EXPECTED_IP=$3
-
-    echo "DNS kontrolü: $DOMAIN ($RECORD_TYPE)"
-    RESOLVED_IP=$(dig +short $DOMAIN $RECORD_TYPE)
-
-    if [ -z "$RESOLVED_IP" ]; then
-        # CNAME kontrolü
-        CNAME=$(dig +short $DOMAIN CNAME)
-        if [ -z "$CNAME" ]; then
-            echo "Hata: $DOMAIN için $RECORD_TYPE kaydı bulunamadı ve CNAME kaydı mevcut değil."
-            return 1
-        else
-            echo "$DOMAIN için CNAME kaydı mevcut: $CNAME"
-            # CNAME hedefinin A kaydını çöz
-            RESOLVED_IP=$(dig +short $CNAME A)
-            if [ -z "$RESOLVED_IP" ]; then
-                echo "Hata: $CNAME için A kaydı bulunamadı."
-                return 1
-            else
-                echo "$CNAME için A kaydı mevcut: $RESOLVED_IP"
-                # Beklenen IP ile karşılaştır
-                if [ "$RESOLVED_IP" != "$EXPECTED_IP" ]; then
-                    echo "Hata: $CNAME için A kaydı beklenen IP ile eşleşmiyor."
-                    return 1
-                fi
-            fi
-        fi
-    else
-        echo "$DOMAIN için $RECORD_TYPE kaydı mevcut: $RESOLVED_IP"
-        # Beklenen IP ile karşılaştır
-        if [ "$RESOLVED_IP" != "$EXPECTED_IP" ]; then
-            echo "Hata: $DOMAIN için $RECORD_TYPE kaydı beklenen IP ile eşleşmiyor."
-            return 1
-        fi
-    fi
-
-    return 0
-}
-
 # Kullanıcıdan gerekli bilgileri al
 read -p "Lütfen sunucunuzun alan adını girin (örnek: market.kubilaysen.com): " DOMAIN
+read -p "Lütfen MySQL root kullanıcısı için güçlü bir şifre girin: " -s ROOT_PASSWORD
+echo
 read -p "Lütfen 'kubi' kullanıcısı için güçlü bir şifre girin: " -s KUBI_PASSWORD
 echo
 read -p "PrestaShop için PHP'de kullanılacak maksimum dosya yükleme boyutunu girin (örnek: 64M): " UPLOAD_MAX_FILESIZE
@@ -91,32 +50,26 @@ echo "MySQL kuruluyor..."
 sudo apt install -y mysql-server
 check_success "MySQL kurulumu"
 
-# MySQL root kullanıcısının kimlik doğrulama yöntemini kontrol etme ve değiştirme
-echo "MySQL root kullanıcısının kimlik doğrulama yöntemi kontrol ediliyor..."
-AUTH_PLUGIN=$(sudo mysql -e "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost';" | tail -n1 2>/dev/null)
-
-if [ "$AUTH_PLUGIN" != "mysql_native_password" ]; then
-    echo "MySQL root kullanıcısının kimlik doğrulama yöntemi mysql_native_password olarak değiştiriliyor..."
-    sudo mysql <<MYSQL_SCRIPT
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'RootPassword123!';
+# MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme ve şifre belirleme
+echo "MySQL root kullanıcısının kimlik doğrulama yöntemi değiştiriliyor..."
+sudo mysql <<MYSQL_SCRIPT
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ROOT_PASSWORD';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
-    check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme"
-fi
+check_success "MySQL root kullanıcısının kimlik doğrulama yöntemini değiştirme ve şifre belirleme"
 
 # MySQL güvenlik yapılandırması
 echo "MySQL güvenlik yapılandırması yapılıyor..."
-sudo mysql_secure_installation <<EOF
-
-y
-y
-RootPassword123!
-RootPassword123!
-y
-y
-y
-y
-EOF
+sudo mysql <<MYSQL_SCRIPT
+-- Remove anonymous users
+DELETE FROM mysql.user WHERE User='';
+-- Disallow root login remotely
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+-- Remove test database
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
 check_success "MySQL güvenlik yapılandırması"
 
 # MySQL veritabanı ve kullanıcı ayarları
@@ -248,7 +201,6 @@ wget "$PRESTASHOP_URL" -O prestashop_latest.zip
 check_success "PrestaShop sürümünü indirme"
 
 # PrestaShop dosyalarını çıkarma
-sudo mkdir -p $WEB_ROOT
 sudo unzip -o prestashop_latest.zip -d $WEB_ROOT
 check_success "PrestaShop dosyalarını çıkarma"
 
